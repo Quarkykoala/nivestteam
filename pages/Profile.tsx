@@ -1,8 +1,10 @@
 import React from 'react';
 import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 
 export const Profile = () => {
     const { state, updateUser } = useApp();
+    const { user, signOut } = useAuth();
 
     return (
         <div className="flex flex-1 flex-col p-6 lg:p-10 max-w-4xl mx-auto">
@@ -19,9 +21,19 @@ export const Profile = () => {
                                 <p className="text-gray-500 dark:text-gray-400 text-base font-normal leading-normal">{state.user.phone}</p>
                             </div>
                         </div>
-                        <button className="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white text-sm font-bold leading-normal tracking-[0.015em] w-full max-w-[480px] sm:w-auto hover:bg-gray-200 dark:hover:bg-white/20 transition-colors">
-                            <span className="truncate">Edit Profile</span>
-                        </button>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                            <button className="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 bg-gray-100 dark:bg-white/10 text-gray-900 dark:text-white text-sm font-bold leading-normal tracking-[0.015em] w-full max-w-[480px] sm:w-auto hover:bg-gray-200 dark:hover:bg-white/20 transition-colors">
+                                <span className="truncate">Edit Profile</span>
+                            </button>
+                            {user && (
+                                <button
+                                    onClick={() => void signOut()}
+                                    className="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-10 px-4 border border-gray-200 dark:border-white/10 text-gray-900 dark:text-white text-sm font-semibold leading-normal tracking-[0.015em] w-full max-w-[480px] sm:w-auto hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+                                >
+                                    <span className="truncate">Sign out of Google</span>
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
                 

@@ -7,10 +7,12 @@ import { Dashboard } from './pages/Dashboard';
 import { Budget } from './pages/Budget';
 import { Goals } from './pages/Goals';
 import { Profile } from './pages/Profile';
+import { AuthProvider } from './contexts/AuthContext';
 
 function App() {
   return (
-    <AppProvider>
+    <AuthProvider>
+      <AppProvider>
         <HashRouter>
           <Routes>
             <Route path="/" element={<Welcome />} />
@@ -22,7 +24,8 @@ function App() {
             </Route>
           </Routes>
         </HashRouter>
-    </AppProvider>
+      </AppProvider>
+    </AuthProvider>
   );
 }
 
