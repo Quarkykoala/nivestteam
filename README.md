@@ -32,6 +32,8 @@ View your app in AI Studio: https://ai.studio/apps/drive/1PEtN1q20bk8_BfXnSIrTH0
 3. Deploy to Netlify. The included `netlify.toml` already sets the build command (`npm run build`) and publish directory (`dist`).
 4. Each voice command will be captured in Supabase with the related financial context, and snapshots of transactions/goals are stored for building dashboards.
 
+Netlify only builds the Vite React frontend with Node; Python dependencies are isolated under [`backend/`](backend/) for separate hosting of the voice bot.
+
 ## Hosting the voice bot backend
 
 The voice experience depends on the WebSocket bot defined in [`server.py`](server.py) and [`nivest_bot.py`](nivest_bot.py). Deploy it separately from the Netlify static site and point the frontend to it via `VITE_BOT_WS_URL`.
@@ -47,7 +49,7 @@ The voice experience depends on the WebSocket bot defined in [`server.py`](serve
 For local development you can also run the bot with:
 
 ```bash
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
@@ -60,7 +62,7 @@ You can host the same FastAPI bot on AWS instead of Render. The repo includes [`
 1. Install dependencies into a build folder and copy the bot files:
    ```bash
    mkdir -p build
-   pip install -r requirements.txt -t build
+   pip install -r backend/requirements.txt -t build
    cp -r server.py nivest_bot.py aws_lambda_handler.py pipecat build/
    ```
 2. Zip the contents of `build/` and create a **Python 3.11** Lambda function using `aws_lambda_handler.handler` as the entrypoint. Increase the timeout to at least 30 seconds and allocate sufficient memory for audio work (~1024 MB+).
