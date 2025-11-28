@@ -74,7 +74,7 @@ opencv-python==4.12.0.88
 orjson==3.11.4
 packaging==25.0
 pillow==11.3.0
-pipecat-ai==0.0.96
+pipecat-ai[websocket]==0.0.96
 -e git+https://github.com/pipecat-ai/pipecat-flows.git@92dedda66278db4a42602e2ddfbd542d41cc7abb#egg=pipecat_ai_flows
 pipecat-ai-small-webrtc-prebuilt==1.0.0
 propcache==0.4.1
