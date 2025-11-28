@@ -25,16 +25,52 @@ const defaultState: AppState = {
     monthlyIncome: 50000
 };
 
+const STORAGE_KEY = 'nivest-app-state';
+
+const loadPersistedState = (): AppState => {
+    if (typeof window === 'undefined') {
+        return defaultState;
+    }
+
+    try {
+        const stored = window.localStorage.getItem(STORAGE_KEY);
+        if (!stored) return defaultState;
+
+        const parsed = JSON.parse(stored) as Partial<AppState>;
+        return {
+            ...defaultState,
+            ...parsed,
+            user: { ...defaultState.user, ...parsed.user },
+            transactions: parsed.transactions ?? defaultState.transactions,
+            goals: parsed.goals ?? defaultState.goals,
+            monthlyIncome: parsed.monthlyIncome ?? defaultState.monthlyIncome
+        };
+    } catch (error) {
+        console.warn('Failed to load saved financial state', error);
+        return defaultState;
+    }
+};
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
-    const [state, setState] = useState<AppState>(defaultState);
+    const [state, setState] = useState<AppState>(() => loadPersistedState());
     const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
         void recordFinancialSnapshot({ state, reason: 'app-init' });
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+
+        try {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        } catch (error) {
+            console.warn('Failed to persist financial state', error);
+        }
+    }, [state]);
 
     const persistSnapshot = (nextState: AppState, reason: string) => {
         void recordFinancialSnapshot({ state: nextState, reason });
