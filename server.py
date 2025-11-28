@@ -1,18 +1,28 @@
 import os
+import sys
 import uvicorn
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 
-# Try importing from different locations to be robust across versions
+# Add local pipecat source to sys.path to ensure we can import it
+# even if pip install -e failed or wasn't run.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+pipecat_src = os.path.join(current_dir, "pipecat", "src")
+if os.path.exists(pipecat_src):
+    sys.path.insert(0, pipecat_src)
+    logger.info(f"Added {pipecat_src} to sys.path")
+
 try:
-    from pipecat.transports.network.fastapi_websocket import FastAPIWebsocketTransport, FastAPIWebsocketParams
-except ImportError:
+    from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport, FastAPIWebsocketParams
+except ImportError as e:
+    logger.error(f"Failed to import FastAPIWebsocketTransport: {e}")
+    # Fallback to the deprecated path just in case
     try:
-        from pipecat.transports.websocket.fastapi import FastAPIWebsocketTransport, FastAPIWebsocketParams
+        from pipecat.transports.network.fastapi_websocket import FastAPIWebsocketTransport, FastAPIWebsocketParams
     except ImportError:
-        # Fallback or re-raise
-        from pipecat.transports.fastapi_websocket import FastAPIWebsocketTransport, FastAPIWebsocketParams
+        logger.error("Could not import FastAPIWebsocketTransport from any known location.")
+        raise
 
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.runner.types import RunnerArguments
