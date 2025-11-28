@@ -26,7 +26,11 @@ export const useVoiceBot = () => {
       setStatus('connecting');
       setError(null);
 
-      const ws = new WebSocket('ws://localhost:8000/ws');
+      const wsUrl =
+        import.meta.env.VITE_BOT_WS_URL ||
+        `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;
+
+      const ws = new WebSocket(wsUrl);
       websocketRef.current = ws;
 
       ws.onopen = () => {

@@ -58,6 +58,7 @@ joblib==1.5.2
 llvmlite==0.44.0
 loguru==0.7.3
 Markdown==3.10
+mangum==0.17.0
 markdown-it-py==4.0.0
 MarkupSafe==3.0.3
 marshmallow==3.26.1
