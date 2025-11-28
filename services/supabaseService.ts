@@ -19,7 +19,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabaseClient: SupabaseClient | null =
     supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
-const getSupabaseClient = (): SupabaseClient | null => {
+export const getSupabaseClient = (): SupabaseClient | null => {
     if (!supabaseClient) {
         console.warn('Supabase credentials missing; skipping capture.');
         return null;

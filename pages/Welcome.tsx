@@ -1,8 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 export const Welcome = () => {
     const navigate = useNavigate();
+    const { signInWithGoogle, isAuthenticating, user } = useAuth();
 
     return (
         <div className="layout-container flex h-screen grow flex-col bg-background-light dark:bg-background-dark">
@@ -21,14 +23,28 @@ export const Welcome = () => {
                         <p className="text-slate-700 dark:text-white/80 text-base font-normal leading-normal pb-3 pt-1">Your voice-based financial coach for managing money.</p>
                     </div>
                     <div className="flex px-4 py-3 justify-center mt-4">
-                        <button 
+                        <button
                             onClick={() => navigate('/dashboard')}
                             className="flex w-full min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-14 px-5 bg-primary hover:bg-blue-600 transition-all text-white text-base font-bold leading-normal tracking-[0.015em] shadow-lg shadow-primary/30"
                         >
                             <span className="truncate">Start with voice / WhatsApp / Call</span>
                         </button>
                     </div>
-                    <p className="text-primary/80 dark:text-primary/70 text-sm font-normal leading-normal pb-3 pt-1 px-4 text-center underline cursor-pointer hover:text-primary">Already have an account? Log in</p>
+                    <div className="flex px-4 py-2 justify-center">
+                        <button
+                            onClick={() => void signInWithGoogle()}
+                            disabled={isAuthenticating}
+                            className="flex w-full min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center gap-3 overflow-hidden rounded-full h-14 px-5 border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-base font-semibold leading-normal tracking-[0.015em] shadow-sm disabled:opacity-70 disabled:cursor-not-allowed"
+                        >
+                            <span className="material-symbols-outlined text-xl">account_circle</span>
+                            <span className="truncate">
+                                {isAuthenticating ? 'Connecting to Google...' : 'Continue with Google'}
+                            </span>
+                        </button>
+                    </div>
+                    <p className="text-primary/80 dark:text-primary/70 text-sm font-normal leading-normal pb-3 pt-1 px-4 text-center underline cursor-pointer hover:text-primary" onClick={() => void signInWithGoogle()}>
+                        {user ? `Signed in as ${user.email}` : 'Already have an account? Log in'}
+                    </p>
                 </div>
             </main>
         </div>
