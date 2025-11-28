@@ -1,0 +1,7 @@
+{
+  "name": "Nivest - AI Financial Coach",
+  "description": "A voice-first financial tracking application using Gemini 2.5 Flash Lite for logic and simulating Sarvam AI/Pipecat flow.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
