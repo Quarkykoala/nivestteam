@@ -1,7 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Initialize Gemini Client
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY ?? process.env.GEMINI_API_KEY;
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 const MODEL_NAME = 'gemini-2.5-flash';
 
@@ -18,6 +19,8 @@ If the input is about saving for something, type is 'goal'.
 
 export const parseFinancialCommand = async (command: string) => {
     try {
+        if (!ai) throw new Error("Gemini API key is missing");
+
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
             contents: command,
@@ -51,6 +54,8 @@ export const parseFinancialCommand = async (command: string) => {
 
 export const getFinancialAdvice = async (context: any) => {
     try {
+        if (!ai) throw new Error("Gemini API key is missing");
+
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
             contents: `Here is the user's current financial snapshot: ${JSON.stringify(context)}. Give a 1 sentence tip.`,
