@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Python and build artifacts for Lambda deployment
+.venv/
+build/
+package.zip
