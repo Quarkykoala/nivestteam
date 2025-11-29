@@ -22,7 +22,9 @@ const getSpeechRecognition = (): RecognitionInstance | null => {
   return Recognition ? new (Recognition as RecognitionConstructor)() : null;
 };
 
-const BOT_WS_URL = (import.meta.env.VITE_BOT_WS_URL as string) || 'ws://localhost:8000/ws';
+// SmallWebRTC ships a built-in client hosted at /client when using the WebRTC transport.
+// Default to that path locally so the voice bot connects correctly without extra config.
+const BOT_WS_URL = (import.meta.env.VITE_BOT_WS_URL as string) || 'ws://localhost:8000/client';
 
 export const useVoiceBot = () => {
   const [status, setStatus] = useState<VoiceBotStatus>('idle');
