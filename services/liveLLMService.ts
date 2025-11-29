@@ -1,9 +1,9 @@
 const OPENAI_MODEL = 'gpt-4o-mini';
-const GEMINI_MODEL = 'gemini-2.0-flash-exp';
+const GEMINI_MODEL = 'gemini-3.0-flash';
 const OPENAI_VOICE_MODEL = 'gpt-4o-mini-tts';
 const OPENAI_VOICE = import.meta.env.VITE_LIVE_VOICE || 'alloy';
 
-const provider = (import.meta.env.VITE_LIVE_PROVIDER || 'openai').toLowerCase();
+const provider = (import.meta.env.VITE_LIVE_PROVIDER || 'gemini').toLowerCase();
 const openaiKey = import.meta.env.VITE_OPENAI_API_KEY;
 const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
