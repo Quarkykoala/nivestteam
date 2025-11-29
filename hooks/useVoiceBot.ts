@@ -22,6 +22,8 @@ const getSpeechRecognition = (): RecognitionInstance | null => {
   return Recognition ? new (Recognition as RecognitionConstructor)() : null;
 };
 
+const BOT_WS_URL = (import.meta.env.VITE_BOT_WS_URL as string) || 'ws://localhost:8000/ws';
+
 export const useVoiceBot = () => {
   const [status, setStatus] = useState<VoiceBotStatus>('idle');
   const [isListening, setIsListening] = useState(false);
@@ -33,6 +35,14 @@ export const useVoiceBot = () => {
   const spokenTextRef = useRef('');
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const websocketRef = useRef<WebSocket | null>(null);
+  const websocketPromiseRef = useRef<Promise<WebSocket> | null>(null);
+
+  const disconnectBot = useCallback(() => {
+    websocketRef.current?.close();
+    websocketRef.current = null;
+    websocketPromiseRef.current = null;
+  }, []);
 
   const reset = useCallback(() => {
     setIsListening(false);
@@ -48,7 +58,8 @@ export const useVoiceBot = () => {
       URL.revokeObjectURL(audioUrlRef.current);
       audioUrlRef.current = null;
     }
-  }, []);
+    disconnectBot();
+  }, [disconnectBot]);
 
   const fallbackSpeak = useCallback(
     (text: string) => {
@@ -110,16 +121,141 @@ export const useVoiceBot = () => {
       spokenTextRef.current = '';
 
       try {
+        const transport = await (async () => {
+          if (websocketRef.current?.readyState === WebSocket.OPEN) {
+            return websocketRef.current;
+          }
+
+          if (websocketPromiseRef.current) {
+            return websocketPromiseRef.current;
+          }
+
+          websocketPromiseRef.current = new Promise<WebSocket>((resolve, reject) => {
+            try {
+              const socket = new WebSocket(BOT_WS_URL);
+
+              socket.onopen = () => {
+                websocketRef.current = socket;
+                setError(null);
+                resolve(socket);
+                websocketPromiseRef.current = null;
+              };
+
+              socket.onerror = (event) => {
+                console.error('Voice bot WebSocket error', event);
+                setError('Unable to reach the voice bot');
+                websocketRef.current = null;
+                websocketPromiseRef.current = null;
+                reject(new Error('WebSocket connection failed'));
+              };
+
+              socket.onclose = () => {
+                websocketRef.current = null;
+              };
+            } catch (err) {
+              websocketRef.current = null;
+              websocketPromiseRef.current = null;
+              reject(err);
+            }
+          });
+
+          if (!websocketPromiseRef.current) {
+            throw new Error('Failed to initialize voice bot connection');
+          }
+
+          return websocketPromiseRef.current;
+        })();
+
+        await new Promise<void>((resolve, reject) => {
+          let finished = false;
+
+          const handleChunk = (chunk: string) => {
+            if (!chunk) return;
+            spokenTextRef.current += chunk;
+          };
+
+          const finalize = () => {
+            if (finished) return;
+            finished = true;
+            transport.removeEventListener('message', handleMessage);
+            transport.removeEventListener('error', handleError);
+            transport.removeEventListener('close', handleClose);
+            resolve();
+          };
+
+          const handleMessage = (event: MessageEvent) => {
+            if (event.data instanceof Blob) {
+              event.data
+                .text()
+                .then(handleChunk)
+                .catch((err) => console.error('Failed to read bot blob', err));
+              return;
+            }
+
+            const data = event.data as string;
+            try {
+              const parsed = JSON.parse(data);
+
+              if (parsed?.type === 'chunk' || parsed?.type === 'text') {
+                handleChunk(parsed.chunk || parsed.text || '');
+                return;
+              }
+
+              if (parsed?.type === 'done') {
+                finalize();
+                return;
+              }
+
+              if (parsed?.type === 'error') {
+                throw new Error(parsed?.reason || 'Bot returned an error');
+              }
+            } catch (err) {
+              // Not JSON or parsing failed; treat as plain text chunk
+              handleChunk(typeof data === 'string' ? data : '');
+            }
+          };
+
+          const handleError = (event: Event) => {
+            console.error('Voice bot stream error', event);
+            setError('Bot connection dropped');
+            finished = true;
+            reject(new Error('Voice bot stream error'));
+          };
+
+          const handleClose = () => {
+            finalize();
+          };
+
+          transport.addEventListener('message', handleMessage);
+          transport.addEventListener('error', handleError);
+          transport.addEventListener('close', handleClose);
+
+          try {
+            transport.send(JSON.stringify({ type: 'transcript', text }));
+          } catch (err) {
+            reject(err);
+          }
+        });
+
+        if (!spokenTextRef.current) {
+          spokenTextRef.current = 'I heard you loud and clear.';
+        }
+
+        await speakWithLLMVoice(spokenTextRef.current);
+      } catch (err) {
+        console.error('LLM streaming error', err);
+        setError('Failed to reach LLM, falling back to cloud provider');
+        isStreamingRef.current = false;
+
+        // Fall back to direct API streaming if the WebSocket bot is unavailable
+        spokenTextRef.current = '';
+        setStatus('streaming');
+
         await streamLiveLLMResponse(text, (chunk) => {
           spokenTextRef.current += chunk;
         });
 
         await speakWithLLMVoice(spokenTextRef.current);
-      } catch (err) {
-        console.error('LLM streaming error', err);
-        setError('Failed to reach LLM');
-        setStatus('error');
-        isStreamingRef.current = false;
       }
     },
     [speakWithLLMVoice]
