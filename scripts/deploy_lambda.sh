@@ -7,9 +7,43 @@ set -euo pipefail
 
 echo "Starting Lambda + API Gateway WebSocket deploy script"
 
-if [ -z "${AWS_ROLE_ARN:-}" ] || [ -z "${FUNCTION_NAME:-}" ] || [ -z "${AWS_REGION:-}" ]; then
-  echo "ERROR: Please set AWS_ROLE_ARN, FUNCTION_NAME and AWS_REGION environment variables." >&2
+if [ -z "${FUNCTION_NAME:-}" ] || [ -z "${AWS_REGION:-}" ]; then
+  echo "ERROR: Please set FUNCTION_NAME and AWS_REGION environment variables." >&2
   exit 2
+fi
+
+# If no role provided, create a minimal Lambda execution role
+if [ -z "${AWS_ROLE_ARN:-}" ]; then
+  ROLE_NAME="${FUNCTION_NAME}-role"
+  echo "No AWS_ROLE_ARN provided — creating IAM role $ROLE_NAME with AWSLambdaBasicExecutionRole attached"
+  cat > /tmp/trust-policy.json <<'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Service": "lambda.amazonaws.com" },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+
+  set +e
+  aws iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1
+  if [ $? -ne 0 ]; then
+    aws iam create-role --role-name "$ROLE_NAME" --assume-role-policy-document file:///tmp/trust-policy.json
+    aws iam attach-role-policy --role-name "$ROLE_NAME" --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+    echo "Created role $ROLE_NAME"
+  else
+    echo "Role $ROLE_NAME already exists; reusing"
+  fi
+  set -e
+
+  # wait briefly for eventual consistency
+  sleep 5
+  AWS_ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output text)
+  echo "Using role ARN: $AWS_ROLE_ARN"
 fi
 
 BUILD_DIR=build
@@ -19,8 +53,34 @@ echo "Cleaning and creating build directory..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-echo "Installing Python dependencies into $BUILD_DIR"
-pip install -r backend/requirements.txt -t "$BUILD_DIR"
+echo "Preparing requirements for packaging"
+# Create a temporary requirements file but filter out VCS installs and known-broken/pyproject-mismatch packages.
+TMP_REQ=$(mktemp)
+# packages known to produce packaging/metadata errors when fetched from PyPI during wheel build
+SKIP_PATTERN='pipecat-ai-small-webrtc-prebuilt|pipecat_ai_flows|pipecat-ai-flows'
+grep -v "^git+" backend/requirements.txt | grep -vE "$SKIP_PATTERN" > "$TMP_REQ"
+
+echo "Installing Python dependencies into $BUILD_DIR (excluding git+ and known-broken packages)"
+if ! pip install -r "$TMP_REQ" -t "$BUILD_DIR"; then
+  echo "Warning: some packages failed to install from PyPI; continuing and attempting best-effort packaging." >&2
+fi
+
+# Try to install local copies of pipecat-ai-flows if available in the repo
+if [ -d "src/pipecat-ai-flows" ]; then
+  echo "Found local src/pipecat-ai-flows — installing into package folder"
+  pip install ./src/pipecat-ai-flows -t "$BUILD_DIR" || echo "Warning: local pipecat-ai-flows install failed" >&2
+fi
+
+# pipecat-ai-small-webrtc-prebuilt has inconsistent metadata on PyPI (name mismatch). If a local wheel or folder
+# exists, install it; otherwise skip and warn the user to provide a wheel or editable source.
+if [ -d "src/pipecat-ai-small-webrtc-prebuilt" ]; then
+  echo "Installing local pipecat-ai-small-webrtc-prebuilt"
+  pip install ./src/pipecat-ai-small-webrtc-prebuilt -t "$BUILD_DIR" || echo "Warning: local small-webrtc-prebuilt install failed" >&2
+else
+  echo "Notice: skipping pipecat-ai-small-webrtc-prebuilt due to upstream metadata mismatch. If this package is required in Lambda, provide a local wheel or source in src/ or update backend/requirements.txt to a compatible package." >&2
+fi
+
+rm -f "$TMP_REQ"
 
 echo "Copying application files..."
 cp -r server.py nivest_bot.py aws_lambda_handler.py pipecat "$BUILD_DIR/" || true
