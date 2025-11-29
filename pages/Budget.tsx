@@ -42,7 +42,7 @@ export const Budget = () => {
         </button>
       </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="flex flex-col gap-8">
         <div className="flex flex-col gap-4 bg-white dark:bg-slate-900/50 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-white/5">
           <h2 className="text-text-dark-primary dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em]">Your Monthly Income</h2>
           <div className="relative">

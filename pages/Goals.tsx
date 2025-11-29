@@ -22,7 +22,7 @@ export const Goals = () => {
                     <span className="truncate">Add New Goal</span>
                 </button>
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-4">
+            <div className="flex flex-col gap-8 p-4">
 
                 {state.goals.length === 0 && (
                     <p className="text-gray-600 dark:text-gray-300">No goals found yet. Add one via voice or the budget page to start tracking.</p>
@@ -70,25 +70,25 @@ export const Goals = () => {
                     );
                 })}
 
-                <div className="lg:col-span-2 flex flex-col rounded-xl bg-white dark:bg-slate-900/50 shadow-sm border border-gray-100 dark:border-white/5 p-6 gap-4">
+                <div className="flex flex-col rounded-xl bg-white dark:bg-slate-900/50 shadow-sm border border-gray-100 dark:border-white/5 p-6 gap-4">
                     <div className="flex items-center gap-3">
                         <span className="material-symbols-outlined text-primary text-3xl">tips_and_updates</span>
                         <h3 className="text-text-dark-primary dark:text-white text-xl font-bold">Actionable Tips</h3>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <div className="flex items-center gap-4 p-4 rounded-xl bg-background-light dark:bg-white/5">
-                            <span className="material-symbols-outlined text-primary text-2xl">restaurant_menu</span>
-                            <p className="text-gray-600 dark:text-gray-300 text-sm">Reduce eating out by ₹1000 this month.</p>
-                        </div>
-                        <div className="flex items-center gap-4 p-4 rounded-xl bg-background-light dark:bg-white/5">
-                            <span className="material-symbols-outlined text-primary text-2xl">calendar_today</span>
-                            <p className="text-gray-600 dark:text-gray-300 text-sm">Set aside ₹500 every week for your goal.</p>
-                        </div>
-                        <div className="flex items-center gap-4 p-4 rounded-xl bg-background-light dark:bg-white/5">
-                            <span className="material-symbols-outlined text-primary text-2xl">local_mall</span>
-                            <p className="text-gray-600 dark:text-gray-300 text-sm">Wait 24 hours before making a big purchase.</p>
-                        </div>
-                    </div>
+                      <div className="flex flex-col gap-4">
+                          <div className="flex items-center gap-4 p-4 rounded-xl bg-background-light dark:bg-white/5">
+                              <span className="material-symbols-outlined text-primary text-2xl">restaurant_menu</span>
+                              <p className="text-gray-600 dark:text-gray-300 text-sm">Reduce eating out by ₹1000 this month.</p>
+                          </div>
+                          <div className="flex items-center gap-4 p-4 rounded-xl bg-background-light dark:bg-white/5">
+                              <span className="material-symbols-outlined text-primary text-2xl">calendar_today</span>
+                              <p className="text-gray-600 dark:text-gray-300 text-sm">Set aside ₹500 every week for your goal.</p>
+                          </div>
+                          <div className="flex items-center gap-4 p-4 rounded-xl bg-background-light dark:bg-white/5">
+                              <span className="material-symbols-outlined text-primary text-2xl">local_mall</span>
+                              <p className="text-gray-600 dark:text-gray-300 text-sm">Wait 24 hours before making a big purchase.</p>
+                          </div>
+                      </div>
                 </div>
             </div>
         </div>
