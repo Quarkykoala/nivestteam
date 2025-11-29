@@ -27,7 +27,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1PEtN1q20bk8_BfXnSIrTH0
 2. Add the following environment variables in your Netlify dashboard:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_BOT_WS_URL` (optional, overrides the default WebSocket endpoint)
+   - `VITE_BOT_WS_URL` (optional, overrides the default WebSocket endpoint; defaults to the hosted ngrok tunnel)
    - `VITE_GEMINI_API_KEY`
 3. Deploy to Netlify. The included `netlify.toml` already sets the build command (`npm run build`) and publish directory (`dist`).
 4. Each voice command will be captured in Supabase with the related financial context, and snapshots of transactions/goals are stored for building dashboards.
@@ -54,7 +54,7 @@ pip install -r backend/requirements.txt
 uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
-Then start the frontend (`npm run dev`) and visit the app; it will connect to `ws://localhost:8000/client` by default unless `VITE_BOT_WS_URL` is set. The WebRTC transport relies on the SmallWebRTC prebuilt client that serves this `/client` endpoint locally.
+Then start the frontend (`npm run dev`) and visit the app; it will connect to `wss://68015b6d8f1d.ngrok-free.app/client` by default unless `VITE_BOT_WS_URL` is set. The WebRTC transport relies on the SmallWebRTC prebuilt client that serves this `/client` endpoint locally.
 
 ### Deploying to AWS Lambda + API Gateway (WebSocket)
 

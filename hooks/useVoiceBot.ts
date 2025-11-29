@@ -23,8 +23,9 @@ const getSpeechRecognition = (): RecognitionInstance | null => {
 };
 
 // SmallWebRTC ships a built-in client hosted at /client when using the WebRTC transport.
-// Default to that path locally so the voice bot connects correctly without extra config.
-const BOT_WS_URL = (import.meta.env.VITE_BOT_WS_URL as string) || 'ws://localhost:8000/client';
+// Default to the hosted ngrok tunnel so the frontend can reach the live voice bot without extra config.
+const BOT_WS_URL =
+  (import.meta.env.VITE_BOT_WS_URL as string) || 'wss://68015b6d8f1d.ngrok-free.app/client';
 
 export const useVoiceBot = () => {
   const [status, setStatus] = useState<VoiceBotStatus>('idle');
