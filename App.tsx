@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './contexts/AppContext';
 import { AuthProvider } from './contexts/AuthContext';
 
@@ -9,15 +9,17 @@ const Dashboard = lazy(() => import('./pages/Dashboard').then(module => ({ defau
 const Budget = lazy(() => import('./pages/Budget').then(module => ({ default: module.Budget })));
 const Goals = lazy(() => import('./pages/Goals').then(module => ({ default: module.Goals })));
 const Profile = lazy(() => import('./pages/Profile').then(module => ({ default: module.Profile })));
+const AuthCallback = lazy(() => import('./pages/AuthCallback').then(module => ({ default: module.AuthCallback })));
 
 function App() {
   return (
     <AuthProvider>
       <AppProvider>
-        <HashRouter>
+        <BrowserRouter>
           <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading experience...</div>}>
             <Routes>
               <Route path="/" element={<Welcome />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/budget" element={<Budget />} />
@@ -26,7 +28,7 @@ function App() {
               </Route>
             </Routes>
           </Suspense>
-        </HashRouter>
+        </BrowserRouter>
       </AppProvider>
     </AuthProvider>
   );
