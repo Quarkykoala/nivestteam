@@ -40,6 +40,7 @@ export type AppContextType = {
     updateUser: (updates: Partial<UserProfile>) => Promise<void>;
     updateMonthlyIncome: (income: number) => Promise<void>;
     processVoiceCommand: (text: string) => Promise<string>;
+    startGuestExperience: () => void;
     isProcessing: boolean;
     isLoading: boolean;
 };
