@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, PropsWithChildren } from 'react';
+import React, {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
+    PropsWithChildren,
+} from 'react';
 import { AppState, AppContextType, Transaction, Goal, UserProfile } from '../types';
 import { parseFinancialCommand } from '../services/geminiService';
 import {
@@ -37,6 +45,8 @@ export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
     const [state, setState] = useState<AppState>(emptyState);
     const [isProcessing, setIsProcessing] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [hasHydrated, setHasHydrated] = useState(false);
+    const [isHydrating, setIsHydrating] = useState(false);
 
     const userAvatar = useMemo(() => {
         if (!user) return '';
@@ -44,15 +54,39 @@ export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
     }, [state.user.avatarUrl, user]);
 
     useEffect(() => {
-        const loadData = async () => {
-            if (!user) {
-                setState(emptyState);
-                setIsLoading(false);
-                return;
-            }
+        if (!user) {
+            setState(emptyState);
+            setHasHydrated(false);
+            setIsLoading(false);
+            return;
+        }
 
-            setIsLoading(true);
+        // Prepare a lightweight local profile without touching Supabase tables.
+        setState(prev => ({
+            ...emptyState,
+            user: {
+                ...prev.user,
+                name: prev.user.name || user.user_metadata?.full_name || user.email || 'User',
+                role: prev.user.role || 'Member',
+                phone: prev.user.phone || user.phone || '',
+                avatarUrl: prev.user.avatarUrl || user.user_metadata?.avatar_url || '',
+                language: prev.user.language,
+                interactionMode: prev.user.interactionMode,
+            },
+        }));
 
+        setHasHydrated(false);
+        setIsLoading(false);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user?.id]);
+
+    const hydrateFromSupabase = useCallback(async () => {
+        if (!user || hasHydrated || isHydrating) return;
+
+        setIsHydrating(true);
+        setIsLoading(true);
+
+        try {
             const [profile, transactions, goals, monthlyIncome, budgets] = await Promise.all([
                 fetchProfile(user.id),
                 fetchTransactions(user.id),
@@ -75,37 +109,56 @@ export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
                     }))
                 );
 
-            const mappedProfile: UserProfile = {
-                name: profile?.full_name ?? user.user_metadata?.full_name ?? user.email ?? 'User',
-                role: state.user.role || 'Member',
-                phone: profile?.phone ?? user.phone ?? '',
-                avatarUrl: userAvatar || profile?.full_name?.slice(0, 1) || '',
-                language: state.user.language,
-                interactionMode: state.user.interactionMode,
-            };
-
             const incomeFromTransactions = transactions
                 .filter(t => t.type === 'income')
                 .reduce((acc, curr) => acc + curr.amount, 0);
 
-            const nextState: AppState = {
-                user: mappedProfile,
-                transactions,
-                goals: enrichedGoals,
-                monthlyIncome: monthlyIncome || incomeFromTransactions,
-            };
+            let hydratedState: AppState | null = null;
 
-            setState(nextState);
+            setState(prev => {
+                const mappedProfile: UserProfile = {
+                    name:
+                        profile?.full_name ??
+                        prev.user.name ??
+                        user.user_metadata?.full_name ??
+                        user.email ??
+                        'User',
+                    role: prev.user.role || 'Member',
+                    phone: profile?.phone ?? prev.user.phone ?? user.phone ?? '',
+                    avatarUrl:
+                        profile?.full_name?.slice(0, 1) ??
+                        prev.user.avatarUrl ??
+                        user.user_metadata?.avatar_url ??
+                        '',
+                    language: prev.user.language,
+                    interactionMode: prev.user.interactionMode,
+                };
+
+                hydratedState = {
+                    user: mappedProfile,
+                    transactions,
+                    goals: enrichedGoals,
+                    monthlyIncome: monthlyIncome || incomeFromTransactions || prev.monthlyIncome,
+                };
+
+                return hydratedState;
+            });
+
+            setHasHydrated(true);
+
+            if (hydratedState) {
+                await recordFinancialSnapshot({ state: hydratedState, userId: user.id, reason: 'post-interaction-load' });
+            }
+        } catch (error) {
+            console.error('Failed to hydrate Supabase data after interaction', error);
+        } finally {
+            setIsHydrating(false);
             setIsLoading(false);
-            await recordFinancialSnapshot({ state: nextState, userId: user.id, reason: 'app-init' });
-        };
-
-        void loadData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [user?.id]);
+        }
+    }, [hasHydrated, isHydrating, user]);
 
     const persistSnapshot = (nextState: AppState, reason: string) => {
-        if (!user) return;
+        if (!user || !hasHydrated) return;
         void recordFinancialSnapshot({ state: nextState, userId: user.id, reason });
     };
 
@@ -169,6 +222,7 @@ export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
 
     const processVoiceCommand = async (text: string): Promise<string> => {
         setIsProcessing(true);
+        await hydrateFromSupabase();
         try {
             const result = await parseFinancialCommand(text);
             if (!result) {
