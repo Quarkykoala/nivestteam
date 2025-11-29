@@ -35,9 +35,11 @@ export interface AppState {
 
 export type AppContextType = {
     state: AppState;
-    addTransaction: (transaction: Omit<Transaction, 'id' | 'date'>) => void;
-    addGoal: (goal: Omit<Goal, 'id'>) => void;
-    updateUser: (updates: Partial<UserProfile>) => void;
+    addTransaction: (transaction: Omit<Transaction, 'id' | 'date'>) => Promise<void>;
+    addGoal: (goal: Omit<Goal, 'id'>) => Promise<void>;
+    updateUser: (updates: Partial<UserProfile>) => Promise<void>;
+    updateMonthlyIncome: (income: number) => Promise<void>;
     processVoiceCommand: (text: string) => Promise<string>;
     isProcessing: boolean;
+    isLoading: boolean;
 };
