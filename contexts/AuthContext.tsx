@@ -41,10 +41,12 @@ export const AuthProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
 
         setIsAuthenticating(true);
         try {
-            const redirectTo = `${window.location.origin}${window.location.pathname}#/dashboard`;
             const { error } = await client.auth.signInWithOAuth({
                 provider: 'google',
-                options: { redirectTo }
+                options: {
+                    // Supabase will send the user back here after Google completes the flow.
+                    redirectTo: 'https://nivestteam.netlify.app/auth/callback',
+                },
             });
 
             if (error) {
