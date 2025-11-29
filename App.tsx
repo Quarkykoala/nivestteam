@@ -19,7 +19,7 @@ function App() {
           <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading experience...</div>}>
             <Routes>
               <Route path="/" element={<Welcome />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/auth/google/callback" element={<AuthCallback />} />
               <Route element={<Layout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/budget" element={<Budget />} />

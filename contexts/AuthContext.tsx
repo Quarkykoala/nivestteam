@@ -45,7 +45,7 @@ export const AuthProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
                 provider: 'google',
                 options: {
                     // Supabase will send the user back here after Google completes the flow.
-                    redirectTo: 'https://nivestteam.netlify.app/auth/callback',
+                    redirectTo: `${window.location.origin}/auth/google/callback`,
                 },
             });
 
