@@ -33,6 +33,7 @@ View your app in AI Studio: https://ai.studio/apps/drive/1PEtN1q20bk8_BfXnSIrTH0
 4. Each voice command will be captured in Supabase with the related financial context, and snapshots of transactions/goals are stored for building dashboards.
 
 Netlify only builds the Vite React frontend with Node; Python dependencies are isolated under [`backend/`](backend/) for separate hosting of the voice bot.
+Leave Python runtime markers (e.g., `runtime.txt`) out of the Netlify deploy—the repository omits them so the build image skips installing Python and focuses solely on the React build.
 
 ## Hosting the voice bot backend
 
