@@ -23,9 +23,9 @@ export const parseFinancialCommand = async (command: string) => {
 
         const response = await ai.models.generateContent({
             model: MODEL_NAME,
-            contents: command,
-            config: {
-                systemInstruction: PARSE_TRANSACTION_SYSTEM_INSTRUCTION,
+            systemInstruction: PARSE_TRANSACTION_SYSTEM_INSTRUCTION,
+            contents: [{ role: 'user', parts: [{ text: command }] }],
+            generationConfig: {
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.OBJECT,
@@ -42,7 +42,7 @@ export const parseFinancialCommand = async (command: string) => {
             }
         });
 
-        const text = response.text;
+        const text = response.text();
         if (!text) return null;
         return JSON.parse(text);
 
@@ -60,7 +60,7 @@ export const getFinancialAdvice = async (context: any) => {
             model: MODEL_NAME,
             contents: `Here is the user's current financial snapshot: ${JSON.stringify(context)}. Give a 1 sentence tip.`,
         });
-        return response.text;
+        return response.text();
     } catch (error) {
         return "Keep tracking your expenses to stay on top of your goals!";
     }
