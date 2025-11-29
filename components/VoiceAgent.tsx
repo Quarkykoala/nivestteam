@@ -6,14 +6,14 @@ interface VoiceAgentProps {
   onClose: () => void;
 }
 
-type UiState = 'connecting' | 'listening' | 'processing' | 'playing' | 'error';
+type UiState = 'idle' | 'listening' | 'processing' | 'streaming' | 'error';
 
 export const VoiceAgent: React.FC<VoiceAgentProps> = ({ onClose }) => {
   const { processVoiceCommand, isProcessing } = useApp();
   const { status, error, startListening, stopListening, isListening } = useVoiceBot();
   const [transcript, setTranscript] = useState('');
   const [aiResponse, setAiResponse] = useState('Listening...');
-  const [manualState, setManualState] = useState<UiState>('connecting');
+  const [manualState, setManualState] = useState<UiState>('idle');
 
   useEffect(() => {
     startListening();
@@ -23,12 +23,12 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ onClose }) => {
   useEffect(() => {
     if (status === 'error') {
       setManualState('error');
-    } else if (status === 'playing') {
-      setManualState('playing');
+    } else if (status === 'streaming') {
+      setManualState('streaming');
     } else if (status === 'listening') {
       setManualState(isProcessing ? 'processing' : 'listening');
-    } else if (status === 'connecting') {
-      setManualState('connecting');
+    } else {
+      setManualState('idle');
     }
   }, [isProcessing, status]);
 
@@ -38,7 +38,7 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ onClose }) => {
     setManualState('processing');
     const response = await processVoiceCommand(transcript);
 
-    setManualState('playing');
+    setManualState('streaming');
     setAiResponse(response);
 
     setTimeout(() => {
@@ -48,9 +48,8 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ onClose }) => {
   };
 
   const statusText = useMemo(() => {
-    if (manualState === 'connecting') return 'Connecting to VoiceMitra...';
     if (manualState === 'processing') return 'Processing your request...';
-    if (manualState === 'playing') return aiResponse;
+    if (manualState === 'streaming') return aiResponse;
     if (manualState === 'error') return error ?? 'Unable to reach the bot.';
     if (!isListening) return 'Tap to start talking';
     return 'Go ahead, I\'m listening...';
@@ -75,15 +74,12 @@ export const VoiceAgent: React.FC<VoiceAgentProps> = ({ onClose }) => {
           {manualState === 'processing' && (
             <div className="absolute inset-0 border-4 border-t-primary border-r-transparent border-b-primary border-l-transparent rounded-full animate-spin"></div>
           )}
-          {manualState === 'connecting' && (
-            <div className="absolute inset-0 border-4 border-dashed border-primary/60 rounded-full animate-spin"></div>
-          )}
           {manualState === 'error' && (
             <div className="absolute inset-0 border-4 border-red-400 rounded-full animate-pulse"></div>
           )}
           <div className="relative z-10 bg-gradient-to-br from-primary to-blue-600 rounded-full size-24 flex items-center justify-center shadow-lg shadow-primary/40">
             <span className="material-symbols-outlined text-white text-4xl">
-              {manualState === 'playing' ? 'graphic_eq' : 'mic'}
+              {manualState === 'streaming' ? 'graphic_eq' : 'mic'}
             </span>
           </div>
         </div>

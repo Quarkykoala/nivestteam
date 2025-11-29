@@ -1,181 +1,195 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { streamLiveLLMResponse, synthesizeLLMVoice } from '../services/liveLLMService';
 
-export type VoiceBotStatus = 'disconnected' | 'connecting' | 'listening' | 'playing' | 'error';
+export type VoiceBotStatus = 'idle' | 'listening' | 'streaming' | 'error';
+
+type RecognitionInstance = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: any) => void) | null;
+  onerror: ((event: any) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type RecognitionConstructor = new () => RecognitionInstance;
+
+const getSpeechRecognition = (): RecognitionInstance | null => {
+  const Recognition =
+    (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  return Recognition ? new (Recognition as RecognitionConstructor)() : null;
+};
 
 export const useVoiceBot = () => {
-  const [status, setStatus] = useState<VoiceBotStatus>('disconnected');
+  const [status, setStatus] = useState<VoiceBotStatus>('idle');
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [transcript, setTranscript] = useState('');
 
-  const websocketRef = useRef<WebSocket | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const audioQueueRef = useRef<Int16Array[]>([]);
-  const isPlayingRef = useRef(false);
-  const nextStartTimeRef = useRef(0);
+  const recognitionRef = useRef<RecognitionInstance | null>(null);
+  const isStreamingRef = useRef(false);
+  const spokenTextRef = useRef('');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+
+  const reset = useCallback(() => {
+    setIsListening(false);
+    setStatus('idle');
+    setTranscript('');
+    spokenTextRef.current = '';
+    isStreamingRef.current = false;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.src = '';
+    }
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
+    }
+  }, []);
+
+  const fallbackSpeak = useCallback(
+    (text: string) => {
+      if (!text.trim()) return;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.onend = () => {
+        isStreamingRef.current = false;
+        reset();
+      };
+      window.speechSynthesis.speak(utterance);
+    },
+    [reset]
+  );
+
+  const speakWithLLMVoice = useCallback(
+    async (fullText: string) => {
+      if (!fullText.trim()) {
+        reset();
+        return;
+      }
+
+      try {
+        const url = await synthesizeLLMVoice(fullText);
+        audioUrlRef.current = url;
+
+        if (audioRef.current) {
+          audioRef.current.pause();
+        }
+
+        const audio = new Audio(url);
+        audioRef.current = audio;
+
+        audio.onended = () => {
+          isStreamingRef.current = false;
+          reset();
+        };
+
+        await audio.play();
+      } catch (err) {
+        console.error('LLM voice playback failed, falling back to device TTS', err);
+        setError('Using device voice while LLM audio is unavailable');
+        fallbackSpeak(fullText);
+        isStreamingRef.current = false;
+        reset();
+      }
+    },
+    [fallbackSpeak, reset]
+  );
+
+  const handleTranscript = useCallback(
+    async (text: string) => {
+      if (!text.trim()) {
+        setStatus('idle');
+        return;
+      }
+
+      setStatus('streaming');
+      isStreamingRef.current = true;
+      spokenTextRef.current = '';
+
+      try {
+        await streamLiveLLMResponse(text, (chunk) => {
+          spokenTextRef.current += chunk;
+        });
+
+        await speakWithLLMVoice(spokenTextRef.current);
+      } catch (err) {
+        console.error('LLM streaming error', err);
+        setError('Failed to reach LLM');
+        setStatus('error');
+        isStreamingRef.current = false;
+      }
+    },
+    [speakWithLLMVoice]
+  );
 
   useEffect(() => {
     return () => {
       stopListening();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const startListening = useCallback(async () => {
-    try {
-      setStatus('connecting');
-      setError(null);
-
-      const wsUrl =
-        import.meta.env.VITE_BOT_WS_URL ||
-        `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;
-
-      const ws = new WebSocket(wsUrl);
-      websocketRef.current = ws;
-
-      ws.onopen = () => {
-        console.log('Connected to bot');
-        setStatus('listening');
-        setIsListening(true);
-        startAudioCapture();
-      };
-
-      ws.onmessage = async (event) => {
-        if (event.data instanceof Blob) {
-          setStatus('playing');
-          const arrayBuffer = await event.data.arrayBuffer();
-          const audioData = new Int16Array(arrayBuffer);
-          queueAudio(audioData);
-        }
-      };
-
-      ws.onclose = () => {
-        console.log('Disconnected from bot');
-        setStatus('disconnected');
-        setIsListening(false);
-        stopAudioCapture();
-      };
-
-      ws.onerror = (e) => {
-        console.error('WebSocket error:', e);
-        setError('Connection failed');
-        setStatus('error');
-      };
-
-    } catch (err) {
-      console.error('Error starting voice assistant:', err);
-      setError('Failed to start');
+  const startListening = useCallback(() => {
+    const recognition = getSpeechRecognition();
+    if (!recognition) {
+      setError('Speech recognition not supported in this browser');
       setStatus('error');
-    }
-  }, []);
-
-  const stopListening = useCallback(() => {
-    if (websocketRef.current) {
-      websocketRef.current.close();
-      websocketRef.current = null;
-    }
-    stopAudioCapture();
-    setIsListening(false);
-    setStatus('disconnected');
-  }, []);
-
-  const startAudioCapture = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-      audioContextRef.current = audioContext;
-
-      const source = audioContext.createMediaStreamSource(stream);
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
-      processorRef.current = processor;
-
-      processor.onaudioprocess = (e) => {
-        if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
-          const inputData = e.inputBuffer.getChannelData(0);
-          const pcmData = new Int16Array(inputData.length);
-          for (let i = 0; i < inputData.length; i++) {
-            pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
-          }
-          websocketRef.current.send(pcmData.buffer);
-        }
-      };
-
-      source.connect(processor);
-      processor.connect(audioContext.destination);
-
-    } catch (err) {
-      console.error('Error capturing audio:', err);
-      setError('Microphone error');
-      setStatus('error');
-    }
-  };
-
-  const stopAudioCapture = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (processorRef.current) {
-      processorRef.current.disconnect();
-      processorRef.current = null;
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
-    }
-  };
-
-  const queueAudio = (audioData: Int16Array) => {
-    audioQueueRef.current.push(audioData);
-    if (!isPlayingRef.current) {
-      playNextChunk();
-    }
-  };
-
-  const playNextChunk = () => {
-    if (audioQueueRef.current.length === 0) {
-      isPlayingRef.current = false;
-      // If we were playing and now stopped, revert status to listening if still connected
-      if (websocketRef.current?.readyState === WebSocket.OPEN) {
-        setStatus('listening');
-      }
       return;
     }
 
-    isPlayingRef.current = true;
-    const audioData = audioQueueRef.current.shift();
-    if (!audioData || !audioContextRef.current) return;
+    reset();
+    setError(null);
+    setStatus('listening');
+    setIsListening(true);
 
-    const audioContext = audioContextRef.current;
-    const buffer = audioContext.createBuffer(1, audioData.length, 16000);
-    const channelData = buffer.getChannelData(0);
+    recognition.lang = 'en-US';
+    recognition.continuous = false;
+    recognition.interimResults = true;
 
-    for (let i = 0; i < audioData.length; i++) {
-      channelData[i] = audioData[i] / 0x7FFF;
-    }
-
-    const source = audioContext.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioContext.destination);
-
-    const currentTime = audioContext.currentTime;
-    const startTime = Math.max(currentTime, nextStartTimeRef.current);
-
-    source.start(startTime);
-    nextStartTimeRef.current = startTime + buffer.duration;
-
-    source.onended = () => {
-      playNextChunk();
+    recognition.onresult = (event) => {
+      const lastResult = event.results[event.results.length - 1];
+      const text = lastResult[0].transcript;
+      setTranscript(text);
+      if (lastResult.isFinal) {
+        recognition.stop();
+        handleTranscript(text);
+      }
     };
-  };
+
+    recognition.onerror = (event) => {
+      console.error('Speech recognition error', event.error);
+      setError('Microphone error');
+      setStatus('error');
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      if (!isStreamingRef.current && status !== 'error') {
+        setStatus('idle');
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }, [handleTranscript, reset, status]);
+
+  const stopListening = useCallback(() => {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    window.speechSynthesis.cancel();
+    reset();
+  }, [reset]);
 
   return {
     isListening,
     status,
+    transcript,
     startListening,
     stopListening,
-    error
+    error,
   };
 };

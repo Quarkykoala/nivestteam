@@ -3,12 +3,11 @@ import { useVoiceBot } from '../hooks/useVoiceBot';
 
 export const VoiceAssistant = () => {
   const { isListening, status, startListening, stopListening, error } = useVoiceBot();
-  const isActive = isListening || status === 'connecting';
+  const isActive = isListening || status === 'streaming';
 
   const statusLabel = (() => {
-    if (status === 'connecting') return 'Connecting to bot...';
     if (status === 'listening') return 'Listening';
-    if (status === 'playing') return 'Playing response';
+    if (status === 'streaming') return 'Streaming response';
     if (status === 'error') return error ?? 'Connection error';
     return 'Tap to talk';
   })();
