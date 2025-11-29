@@ -5,11 +5,12 @@
 
 [build.environment]
   NODE_VERSION = "20"
-
-[[plugins]]
-  package = "@netlify/vite-plugin"
-
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Note: removed invalid plugin entry that caused Netlify to fail with
+# "missing manifest.yml". If you want to enable a Vite plugin, add a
+# valid Netlify build plugin package and its `manifest.yml` or install
+# a community plugin and add it to `package.json`.
