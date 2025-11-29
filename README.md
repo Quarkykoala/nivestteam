@@ -45,7 +45,7 @@ The voice experience depends on the WebSocket bot defined in [`server.py`](serve
 2. Render will detect the [`render.yaml`](render.yaml) manifest and provision a Python service.
 3. Ensure the start command is `uvicorn server:app --host 0.0.0.0 --port $PORT` (already in the manifest).
 4. Add any required bot environment variables (e.g., API keys used by `nivest_bot.py`).
-5. After deployment, set `VITE_BOT_WS_URL` in Netlify to `wss://<your-render-service>.onrender.com/ws` so the frontend routes voice traffic to the hosted bot.
+5. After deployment, set `VITE_BOT_WS_URL` in Netlify to `wss://<your-render-service>.onrender.com/client` so the frontend routes voice traffic to the hosted bot.
 
 For local development you can also run the bot with:
 
@@ -54,7 +54,7 @@ pip install -r backend/requirements.txt
 uvicorn server:app --host 0.0.0.0 --port 8000
 ```
 
-Then start the frontend (`npm run dev`) and visit the app; it will connect to `ws://localhost:8000/ws` by default unless `VITE_BOT_WS_URL` is set.
+Then start the frontend (`npm run dev`) and visit the app; it will connect to `ws://localhost:8000/client` by default unless `VITE_BOT_WS_URL` is set. The WebRTC transport relies on the SmallWebRTC prebuilt client that serves this `/client` endpoint locally.
 
 ### Deploying to AWS Lambda + API Gateway (WebSocket)
 
