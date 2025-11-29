@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { streamLiveLLMResponse, synthesizeLLMVoice } from '../services/liveLLMService';
+import { synthesizeLLMVoice } from '../services/liveLLMService';
 
 export type VoiceBotStatus = 'idle' | 'listening' | 'streaming' | 'error';
 
@@ -244,21 +244,12 @@ export const useVoiceBot = () => {
         await speakWithLLMVoice(spokenTextRef.current);
       } catch (err) {
         console.error('LLM streaming error', err);
-        setError('Failed to reach LLM, falling back to cloud provider');
+        setError('Unable to reach the local voice bot');
         isStreamingRef.current = false;
-
-        // Fall back to direct API streaming if the WebSocket bot is unavailable
-        spokenTextRef.current = '';
-        setStatus('streaming');
-
-        await streamLiveLLMResponse(text, (chunk) => {
-          spokenTextRef.current += chunk;
-        });
-
-        await speakWithLLMVoice(spokenTextRef.current);
+        reset();
       }
     },
-    [speakWithLLMVoice]
+    [reset, speakWithLLMVoice]
   );
 
   useEffect(() => {
