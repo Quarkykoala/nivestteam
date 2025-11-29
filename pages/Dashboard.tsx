@@ -72,7 +72,7 @@ export const Dashboard = () => {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+      <section className="flex flex-col gap-6 mb-8">
         <div className="flex flex-1 flex-col gap-2 rounded-2xl p-6 bg-white dark:bg-slate-900/50 dark:border dark:border-white/5 shadow-sm">
           <p className="text-gray-500 dark:text-gray-400 text-base font-medium leading-normal">Estimated Monthly Income</p>
           <p className="text-gray-800 dark:text-white tracking-light text-4xl font-bold leading-tight">₹{state.monthlyIncome.toLocaleString()}</p>
@@ -99,32 +99,32 @@ export const Dashboard = () => {
       </section>
 
       <h2 className="text-gray-900 dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em] mb-4">Your Guides & Actions</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2 rounded-2xl p-6 bg-white dark:bg-slate-900/50 dark:border dark:border-white/5 shadow-sm">
+          <div className="flex flex-1 flex-col gap-2 rounded-2xl p-6 bg-white dark:bg-slate-900/50 dark:border dark:border-white/5 shadow-sm">
             <p className="text-gray-500 dark:text-gray-400 text-base font-medium leading-normal">This Week's Limit</p>
             <p className="text-gray-800 dark:text-white tracking-light text-3xl font-bold leading-tight">₹7,000</p>
           </div>
-          <div className="flex flex-col gap-2 rounded-2xl p-6 bg-white dark:bg-slate-900/50 dark:border dark:border-white/5 shadow-sm">
+          <div className="flex flex-1 flex-col gap-2 rounded-2xl p-6 bg-white dark:bg-slate-900/50 dark:border dark:border-white/5 shadow-sm">
             <p className="text-gray-500 dark:text-gray-400 text-base font-medium leading-normal">Today's Limit</p>
             <p className="text-gray-800 dark:text-white tracking-light text-3xl font-bold leading-tight">₹1,000</p>
           </div>
         </div>
-        <div className="flex flex-col gap-4 rounded-2xl p-6 bg-white dark:bg-slate-900/50 dark:border dark:border-white/5 shadow-sm md:col-span-2 lg:col-span-2">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 flex flex-col items-start justify-between p-6 rounded-2xl bg-primary/10 dark:bg-primary/20">
+        <div className="flex flex-col gap-4 rounded-2xl p-6 bg-white dark:bg-slate-900/50 dark:border dark:border-white/5 shadow-sm">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col items-start justify-between p-6 rounded-2xl bg-primary/10 dark:bg-primary/20">
               <div>
                 <h3 className="text-primary dark:text-blue-200 text-lg font-bold">Weekly Plan</h3>
                 <p className="text-blue-800 dark:text-blue-300 text-sm mt-1">Review your spending plan for the upcoming week.</p>
               </div>
               <button className="mt-4 px-5 py-2.5 bg-primary text-white text-sm font-bold rounded-full hover:bg-primary/90 transition-colors">View Plan</button>
             </div>
-            <div className="flex-1 flex flex-col items-start justify-between p-6 rounded-2xl bg-primary/10 dark:bg-primary/20">
+            <div className="flex flex-col items-start justify-between p-6 rounded-2xl bg-primary/10 dark:bg-primary/20">
               <div>
                 <h3 className="text-primary dark:text-blue-200 text-lg font-bold">Voice Reminders</h3>
                 <p className="text-blue-800 dark:text-blue-300 text-sm mt-1">Get your daily financial tips via voice message.</p>
               </div>
-              <button 
+              <button
                 onClick={() => setShowVoice(true)}
                 className="mt-4 px-5 py-2.5 bg-primary text-white text-sm font-bold rounded-full hover:bg-primary/90 transition-colors flex items-center gap-2"
               >
@@ -133,12 +133,12 @@ export const Dashboard = () => {
               </button>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-4 p-6 rounded-2xl bg-primary/5 dark:bg-white/5 mt-4">
-            <div className="flex-1">
+          <div className="flex flex-col items-start gap-4 p-6 rounded-2xl bg-primary/5 dark:bg-white/5 mt-2">
+            <div className="flex-1 w-full">
               <h3 className="text-primary dark:text-blue-200 text-lg font-bold">Last 7-Day Spend</h3>
               <p className="text-blue-800 dark:text-gray-300 text-sm mt-1">You spent ₹{weeklyExpenses.reduce((acc, curr) => acc + curr.value, 0).toLocaleString()} in the last 7 days.</p>
             </div>
-            <div className="w-full sm:w-48 h-24">
+            <div className="w-full h-32">
                 <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={weeklyExpenses}>
                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
