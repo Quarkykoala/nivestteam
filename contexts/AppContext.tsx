@@ -40,6 +40,92 @@ const emptyState: AppState = {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const createGuestTransactions = (): Transaction[] => {
+    const now = new Date();
+    const formatDate = (daysAgo: number) => {
+        const date = new Date(now);
+        date.setDate(now.getDate() - daysAgo);
+        return date.toISOString();
+    };
+
+    return [
+        {
+            id: 'guest-income-1',
+            type: 'income',
+            category: 'Salary',
+            amount: 75000,
+            description: 'Monthly salary',
+            date: formatDate(3),
+        },
+        {
+            id: 'guest-expense-1',
+            type: 'expense',
+            category: 'Rent',
+            amount: 18000,
+            description: 'Apartment rent',
+            date: formatDate(4),
+        },
+        {
+            id: 'guest-expense-2',
+            type: 'expense',
+            category: 'Groceries',
+            amount: 4200,
+            description: 'Weekly groceries',
+            date: formatDate(2),
+        },
+        {
+            id: 'guest-expense-3',
+            type: 'expense',
+            category: 'Transport',
+            amount: 1200,
+            description: 'Cabs & metro',
+            date: formatDate(1),
+        },
+        {
+            id: 'guest-expense-4',
+            type: 'expense',
+            category: 'Dining',
+            amount: 1600,
+            description: 'Dinner with friends',
+            date: formatDate(0),
+        },
+    ];
+};
+
+const buildGuestState = (): AppState => ({
+    user: {
+        name: 'Guest',
+        role: 'Explorer',
+        phone: '',
+        avatarUrl:
+            'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=256&q=80',
+        language: 'English',
+        interactionMode: 'Voice',
+    },
+    transactions: createGuestTransactions(),
+    goals: [
+        {
+            id: 'guest-goal-1',
+            title: 'Emergency Fund',
+            currentAmount: 35000,
+            targetAmount: 100000,
+            icon: 'shield',
+            color: 'bg-primary/20',
+            monthlyContribution: 5000,
+        },
+        {
+            id: 'guest-goal-2',
+            title: 'Goa Trip',
+            currentAmount: 12000,
+            targetAmount: 30000,
+            icon: 'beach_access',
+            color: 'bg-amber-200',
+            monthlyContribution: 2500,
+        },
+    ],
+    monthlyIncome: 85000,
+});
+
 export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
     const { user } = useAuth();
     const [state, setState] = useState<AppState>(emptyState);
@@ -49,7 +135,7 @@ export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
     const [isHydrating, setIsHydrating] = useState(false);
 
     const userAvatar = useMemo(() => {
-        if (!user) return '';
+        if (!user) return state.user.avatarUrl || '';
         return user.user_metadata?.avatar_url || state.user.avatarUrl || '';
     }, [state.user.avatarUrl, user]);
 
@@ -79,6 +165,13 @@ export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
         setIsLoading(false);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.id]);
+
+    const startGuestExperience = useCallback(() => {
+        setState(buildGuestState());
+        setHasHydrated(false);
+        setIsHydrating(false);
+        setIsLoading(false);
+    }, []);
 
     const hydrateFromSupabase = useCallback(async () => {
         if (!user || hasHydrated || isHydrating) return;
@@ -316,7 +409,19 @@ export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
     };
 
     return (
-        <AppContext.Provider value={{ state: { ...state, user: { ...state.user, avatarUrl: userAvatar } }, addTransaction, addGoal, updateUser, updateMonthlyIncome, processVoiceCommand, isProcessing, isLoading }}>
+        <AppContext.Provider
+            value={{
+                state: { ...state, user: { ...state.user, avatarUrl: userAvatar } },
+                addTransaction,
+                addGoal,
+                updateUser,
+                updateMonthlyIncome,
+                processVoiceCommand,
+                startGuestExperience,
+                isProcessing,
+                isLoading,
+            }}
+        >
             {children}
         </AppContext.Provider>
     );

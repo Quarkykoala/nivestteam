@@ -1,10 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useApp } from '../contexts/AppContext';
 
 export const Welcome = () => {
     const navigate = useNavigate();
     const { signInWithGoogle, isAuthenticating, user } = useAuth();
+    const { startGuestExperience } = useApp();
+
+    const handleGuestStart = () => {
+        startGuestExperience();
+        navigate('/dashboard');
+    };
 
     return (
         <div className="layout-container flex h-screen grow flex-col bg-background-light dark:bg-background-dark">
@@ -24,7 +31,7 @@ export const Welcome = () => {
                     </div>
                     <div className="flex px-4 py-3 justify-center mt-4">
                         <button
-                            onClick={() => navigate('/dashboard')}
+                            onClick={handleGuestStart}
                             className="flex w-full min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-14 px-5 bg-primary hover:bg-blue-600 transition-all text-white text-base font-bold leading-normal tracking-[0.015em] shadow-lg shadow-primary/30"
                         >
                             <span className="truncate">Start with voice / WhatsApp / Call</span>
