@@ -2,7 +2,15 @@ import React from 'react';
 import { useApp } from '../contexts/AppContext';
 
 export const Goals = () => {
-  const { state } = useApp();
+  const { state, isLoading } = useApp();
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <p className="text-gray-600 dark:text-gray-300">Loading your savings plans from Supabase...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 p-4 sm:p-8">
@@ -15,7 +23,11 @@ export const Goals = () => {
                 </button>
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-4">
-                
+
+                {state.goals.length === 0 && (
+                    <p className="text-gray-600 dark:text-gray-300">No goals found yet. Add one via voice or the budget page to start tracking.</p>
+                )}
+
                 {state.goals.map((goal, idx) => {
                     const percentage = Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100));
                     const imageUrl = idx === 0 

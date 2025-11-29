@@ -3,8 +3,16 @@ import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 
 export const Profile = () => {
-    const { state, updateUser } = useApp();
+    const { state, updateUser, isLoading } = useApp();
     const { user, signOut } = useAuth();
+
+    if (isLoading) {
+        return (
+            <div className="p-6 flex items-center justify-center">
+                <p className="text-gray-600 dark:text-gray-300">Loading your profile from Supabase...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-1 flex-col p-6 lg:p-10 max-w-4xl mx-auto">

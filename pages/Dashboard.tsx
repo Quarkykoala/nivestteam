@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { BarChart, Bar, ResponsiveContainer, Cell } from 'recharts';
 import { VoiceAgent } from '../components/VoiceAgent';
 
+const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'] as const;
+
 export const Dashboard = () => {
-  const { state } = useApp();
+  const { state, isLoading } = useApp();
   const [showVoice, setShowVoice] = useState(false);
 
   const totalExpense = state.transactions
@@ -12,23 +14,40 @@ export const Dashboard = () => {
     .reduce((acc, curr) => acc + curr.amount, 0);
 
   const remainingBudget = state.monthlyIncome - totalExpense;
-  const percentageUsed = Math.min(100, Math.round((totalExpense / state.monthlyIncome) * 100));
+  const percentageUsed = state.monthlyIncome
+    ? Math.min(100, Math.round((totalExpense / state.monthlyIncome) * 100))
+    : 0;
 
-  // Dummy data for the chart based on last 7 days (simulated)
-  const data = [
-    { name: 'M', value: 400 },
-    { name: 'T', value: 300 },
-    { name: 'W', value: 600 },
-    { name: 'T', value: 200 },
-    { name: 'F', value: 900 },
-    { name: 'S', value: 500 },
-    { name: 'S', value: 550 },
-  ];
+  const weeklyExpenses = useMemo(() => {
+    const today = new Date();
+    const totals = new Array(7).fill(0);
+
+    state.transactions
+      .filter(t => t.type === 'expense')
+      .forEach(tx => {
+        const txDate = new Date(tx.date);
+        const diffDays = Math.floor((today.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays >= 0 && diffDays < 7) {
+          const index = (today.getDay() - diffDays + 7) % 7;
+          totals[index] += tx.amount;
+        }
+      });
+
+    return totals.map((value, idx) => ({ name: dayLabels[idx], value }));
+  }, [state.transactions]);
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <p className="text-gray-600 dark:text-gray-300">Loading your live financial data...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
       {showVoice && <VoiceAgent onClose={() => setShowVoice(false)} />}
-      
+
       <header className="flex flex-wrap justify-between gap-3 mb-8 items-center">
         <div className="flex min-w-72 flex-col gap-1">
           <h1 className="text-[#181411] dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">Dashboard</h1>
@@ -60,7 +79,7 @@ export const Dashboard = () => {
         </div>
         <div className="flex flex-1 flex-col gap-2 rounded-2xl p-6 bg-white dark:bg-slate-900/50 dark:border dark:border-white/5 shadow-sm">
           <p className="text-gray-500 dark:text-gray-400 text-base font-medium leading-normal">Fixed Costs</p>
-          <p className="text-gray-800 dark:text-white tracking-light text-4xl font-bold leading-tight">₹{(22000).toLocaleString()}</p>
+          <p className="text-gray-800 dark:text-white tracking-light text-4xl font-bold leading-tight">₹{state.transactions.filter(t => t.category?.toLowerCase().includes('rent') || t.category?.toLowerCase().includes('emi') || t.category?.toLowerCase().includes('fee')).reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}</p>
         </div>
         <div className="flex flex-1 flex-col gap-2 rounded-2xl p-6 bg-primary/10 dark:bg-primary/20">
           <p className="text-primary/80 dark:text-blue-300 text-base font-medium leading-normal">Remaining Budget</p>
@@ -117,14 +136,14 @@ export const Dashboard = () => {
           <div className="flex flex-col sm:flex-row items-center gap-4 p-6 rounded-2xl bg-primary/5 dark:bg-white/5 mt-4">
             <div className="flex-1">
               <h3 className="text-primary dark:text-blue-200 text-lg font-bold">Last 7-Day Spend</h3>
-              <p className="text-blue-800 dark:text-gray-300 text-sm mt-1">You spent ₹3,450. That's on track!</p>
+              <p className="text-blue-800 dark:text-gray-300 text-sm mt-1">You spent ₹{weeklyExpenses.reduce((acc, curr) => acc + curr.value, 0).toLocaleString()} in the last 7 days.</p>
             </div>
             <div className="w-full sm:w-48 h-24">
                 <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={data}>
+                    <BarChart data={weeklyExpenses}>
                         <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                            {data.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={index === 4 ? '#359EFF' : '#93C5FD'} />
+                            {weeklyExpenses.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.value > 0 ? '#359EFF' : '#93C5FD'} />
                             ))}
                         </Bar>
                     </BarChart>

@@ -1,119 +1,168 @@
-import React, { createContext, useContext, useEffect, useState, PropsWithChildren } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, PropsWithChildren } from 'react';
 import { AppState, AppContextType, Transaction, Goal, UserProfile } from '../types';
 import { parseFinancialCommand } from '../services/geminiService';
-import { recordConversation, recordFinancialSnapshot } from '../services/supabaseService';
+import {
+    fetchBudgetsWithItems,
+    fetchGoals,
+    fetchMonthlyIncome,
+    fetchProfile,
+    fetchTransactions,
+    insertTransaction,
+    recordConversation,
+    recordFinancialSnapshot,
+    upsertGoals,
+    upsertMonthlyIncome,
+    upsertProfile,
+} from '../services/supabaseService';
+import { useAuth } from './AuthContext';
 
-const defaultState: AppState = {
+const emptyState: AppState = {
     user: {
-        name: "Aarav Sharma",
-        role: "Gig Worker",
-        phone: "+91 98765 43210",
-        avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuD8JO0tyFFec7T92hQiz4VUr_GUMEtlwAKU9AWbavvEzPptg4M9lnZQyqYOIzppP-e-gFiHnufeWAzvacgta9QAnkf88OjFXZk8O50earhDgMkEEnGup3wzp4k5DtCtv6aQu1nFZz3z2AFt4HsFghV8W6lwCAXDLswFv4YhWBKOOIjblNReamPAXThxlp04snsB8cqXaEQU3m7_e2NqrIlr-AnhUrOqJEmZQcJlsil05wfJ3A20RLx655UhcfsN3cLLbFkfFHe38v8",
-        language: 'Hinglish',
-        interactionMode: 'Voice'
+        name: '',
+        role: '',
+        phone: '',
+        avatarUrl: '',
+        language: 'English',
+        interactionMode: 'Voice',
     },
-    transactions: [
-        { id: '1', type: 'expense', category: 'Food', amount: 1200, description: 'Lunch & Groceries', date: new Date().toISOString() },
-        { id: '2', type: 'expense', category: 'Fuel', amount: 850, description: 'Petrol', date: new Date().toISOString() },
-        { id: '3', type: 'expense', category: 'Shopping', amount: 540, description: 'Daily Spend', date: new Date().toISOString() },
-        { id: '4', type: 'expense', category: 'Rent', amount: 7000, description: 'Monthly Rent', date: new Date().toISOString() },
-    ],
-    goals: [
-        { id: '1', title: 'Buy a Bike', currentAmount: 15000, targetAmount: 60000, icon: 'two_wheeler', color: 'bg-orange-500', monthlyContribution: 5000 },
-        { id: '2', title: 'New Phone', currentAmount: 12000, targetAmount: 20000, icon: 'smartphone', color: 'bg-blue-500', monthlyContribution: 2000 }
-    ],
-    monthlyIncome: 50000
-};
-
-const STORAGE_KEY = 'nivest-app-state';
-
-const loadPersistedState = (): AppState => {
-    if (typeof window === 'undefined') {
-        return defaultState;
-    }
-
-    try {
-        const stored = window.localStorage.getItem(STORAGE_KEY);
-        if (!stored) return defaultState;
-
-        const parsed = JSON.parse(stored) as Partial<AppState>;
-        return {
-            ...defaultState,
-            ...parsed,
-            user: { ...defaultState.user, ...parsed.user },
-            transactions: parsed.transactions ?? defaultState.transactions,
-            goals: parsed.goals ?? defaultState.goals,
-            monthlyIncome: parsed.monthlyIncome ?? defaultState.monthlyIncome
-        };
-    } catch (error) {
-        console.warn('Failed to load saved financial state', error);
-        return defaultState;
-    }
+    transactions: [],
+    goals: [],
+    monthlyIncome: 0,
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
-    const [state, setState] = useState<AppState>(() => loadPersistedState());
+    const { user } = useAuth();
+    const [state, setState] = useState<AppState>(emptyState);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const userAvatar = useMemo(() => {
+        if (!user) return '';
+        return user.user_metadata?.avatar_url || state.user.avatarUrl || '';
+    }, [state.user.avatarUrl, user]);
 
     useEffect(() => {
-        void recordFinancialSnapshot({ state, reason: 'app-init' });
+        const loadData = async () => {
+            if (!user) {
+                setState(emptyState);
+                setIsLoading(false);
+                return;
+            }
+
+            setIsLoading(true);
+
+            const [profile, transactions, goals, monthlyIncome, budgets] = await Promise.all([
+                fetchProfile(user.id),
+                fetchTransactions(user.id),
+                fetchGoals(user.id),
+                fetchMonthlyIncome(user.id),
+                fetchBudgetsWithItems(user.id),
+            ]);
+
+            const enrichedGoals: Goal[] = goals.length
+                ? goals
+                : budgets.flatMap(budget =>
+                    budget.budget_items.map(item => ({
+                        id: `${budget.id}-${item.id}`,
+                        title: item.category,
+                        currentAmount: 0,
+                        targetAmount: item.planned_amount,
+                        icon: 'savings',
+                        color: 'bg-primary/20',
+                        monthlyContribution: Math.round(item.planned_amount / Math.max(1, budget.budget_items.length)),
+                    }))
+                );
+
+            const mappedProfile: UserProfile = {
+                name: profile?.full_name ?? user.user_metadata?.full_name ?? user.email ?? 'User',
+                role: state.user.role || 'Member',
+                phone: profile?.phone ?? user.phone ?? '',
+                avatarUrl: userAvatar || profile?.full_name?.slice(0, 1) || '',
+                language: state.user.language,
+                interactionMode: state.user.interactionMode,
+            };
+
+            const incomeFromTransactions = transactions
+                .filter(t => t.type === 'income')
+                .reduce((acc, curr) => acc + curr.amount, 0);
+
+            const nextState: AppState = {
+                user: mappedProfile,
+                transactions,
+                goals: enrichedGoals,
+                monthlyIncome: monthlyIncome || incomeFromTransactions,
+            };
+
+            setState(nextState);
+            setIsLoading(false);
+            await recordFinancialSnapshot({ state: nextState, userId: user.id, reason: 'app-init' });
+        };
+
+        void loadData();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return;
-
-        try {
-            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        } catch (error) {
-            console.warn('Failed to persist financial state', error);
-        }
-    }, [state]);
+    }, [user?.id]);
 
     const persistSnapshot = (nextState: AppState, reason: string) => {
-        void recordFinancialSnapshot({ state: nextState, reason });
+        if (!user) return;
+        void recordFinancialSnapshot({ state: nextState, userId: user.id, reason });
     };
 
-    const addTransaction = (transaction: Omit<Transaction, 'id' | 'date'>) => {
-        const newTransaction: Transaction = {
-            ...transaction,
-            id: Math.random().toString(36).substr(2, 9),
-            date: new Date().toISOString()
-        };
+    const addTransaction = async (transaction: Omit<Transaction, 'id' | 'date'>) => {
+        if (!user) return;
+
+        const saved = await insertTransaction(user.id, transaction);
+        if (!saved) return;
+
         setState(prev => {
             const nextState = {
                 ...prev,
-                transactions: [newTransaction, ...prev.transactions]
+                transactions: [saved, ...prev.transactions],
             };
             persistSnapshot(nextState, 'transaction-added');
             return nextState;
         });
     };
 
-    const addGoal = (goal: Omit<Goal, 'id'>) => {
+    const addGoal = async (goal: Omit<Goal, 'id'>) => {
+        if (!user) return;
+
         const newGoal: Goal = {
             ...goal,
-            id: Math.random().toString(36).substr(2, 9)
+            id: Math.random().toString(36).substr(2, 9),
         };
         setState(prev => {
             const nextState = {
                 ...prev,
-                goals: [...prev.goals, newGoal]
+                goals: [...prev.goals, newGoal],
             };
+            void upsertGoals(user.id, nextState.goals);
             persistSnapshot(nextState, 'goal-added');
             return nextState;
         });
     };
 
-    const updateUser = (updates: Partial<UserProfile>) => {
+    const updateUser = async (updates: Partial<UserProfile>) => {
+        if (!user) return;
+        await upsertProfile(user, { ...state.user, ...updates });
+
         setState(prev => {
             const nextState = {
                 ...prev,
-                user: { ...prev.user, ...updates }
+                user: { ...prev.user, ...updates },
             };
             persistSnapshot(nextState, 'user-updated');
+            return nextState;
+        });
+    };
+
+    const updateMonthlyIncome = async (income: number) => {
+        if (!user) return;
+        await upsertMonthlyIncome(user.id, income);
+        setState(prev => {
+            const nextState = { ...prev, monthlyIncome: income };
+            persistSnapshot(nextState, 'monthly-income-updated');
             return nextState;
         });
     };
@@ -124,45 +173,49 @@ export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
             const result = await parseFinancialCommand(text);
             if (!result) {
                 const parsingFailureResponse = "Sorry, I couldn't understand that.";
-                await recordConversation({
-                    prompt: text,
-                    response: parsingFailureResponse,
-                    userPhone: state.user.phone,
-                    context: { intent: 'unknown', reason: 'parse_failure' }
-                });
+                if (user) {
+                    await recordConversation({
+                        prompt: text,
+                        response: parsingFailureResponse,
+                        userId: user.id,
+                        context: { intent: 'unknown', reason: 'parse_failure' },
+                    });
+                }
                 return parsingFailureResponse;
             }
 
             if (result.intent === 'transaction') {
-                addTransaction({
+                await addTransaction({
                     type: result.type as 'income' | 'expense',
                     category: result.category || 'General',
                     amount: result.amount || 0,
                     description: result.description || 'Voice entry'
                 });
                 const responseMessage = `Added ${result.type} of ₹${result.amount} for ${result.category}`;
-                await recordConversation({
-                    prompt: text,
-                    response: responseMessage,
-                    userPhone: state.user.phone,
-                    context: {
-                        intent: result.intent,
-                        transaction: {
-                            amount: result.amount,
-                            category: result.category,
-                            type: result.type
+                if (user) {
+                    await recordConversation({
+                        prompt: text,
+                        response: responseMessage,
+                        userId: user.id,
+                        context: {
+                            intent: result.intent,
+                            transaction: {
+                                amount: result.amount,
+                                category: result.category,
+                                type: result.type,
+                            },
+                            totals: {
+                                income: state.monthlyIncome,
+                                expenses: state.transactions
+                                    .filter(t => t.type === 'expense')
+                                    .reduce((acc, curr) => acc + curr.amount, 0),
+                            },
                         },
-                        totals: {
-                            income: state.monthlyIncome,
-                            expenses: state.transactions
-                                .filter(t => t.type === 'expense')
-                                .reduce((acc, curr) => acc + curr.amount, 0)
-                        }
-                    }
-                });
+                    });
+                }
                 return responseMessage;
             } else if (result.intent === 'goal') {
-                addGoal({
+                await addGoal({
                     title: result.description || 'New Goal',
                     currentAmount: 0,
                     targetAmount: result.targetAmount || 10000,
@@ -171,31 +224,37 @@ export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
                     monthlyContribution: 0
                 });
                 const responseMessage = `Created goal: ${result.description}`;
-                await recordConversation({
-                    prompt: text,
-                    response: responseMessage,
-                    userPhone: state.user.phone,
-                    context: { intent: result.intent, goal: result.description, user: state.user }
-                });
+                if (user) {
+                    await recordConversation({
+                        prompt: text,
+                        response: responseMessage,
+                        userId: user.id,
+                        context: { intent: result.intent, goal: result.description, user: state.user },
+                    });
+                }
                 return responseMessage;
             }
 
             const unknownResponse = "I understood, but I'm not sure what action to take.";
-            await recordConversation({
-                prompt: text,
-                response: unknownResponse,
-                userPhone: state.user.phone,
-                context: { intent: result.intent, details: result }
-            });
+            if (user) {
+                await recordConversation({
+                    prompt: text,
+                    response: unknownResponse,
+                    userId: user.id,
+                    context: { intent: result.intent, details: result },
+                });
+            }
             return unknownResponse;
         } catch (e) {
             const fallbackResponse = "Something went wrong processing your command.";
-            await recordConversation({
-                prompt: text,
-                response: fallbackResponse,
-                userPhone: state.user.phone,
-                context: { error: true }
-            });
+            if (user) {
+                await recordConversation({
+                    prompt: text,
+                    response: fallbackResponse,
+                    userId: user.id,
+                    context: { error: true },
+                });
+            }
             return fallbackResponse;
         } finally {
             setIsProcessing(false);
@@ -203,7 +262,7 @@ export const AppProvider: React.FC<PropsWithChildren<{}>> = ({ children }) => {
     };
 
     return (
-        <AppContext.Provider value={{ state, addTransaction, addGoal, updateUser, processVoiceCommand, isProcessing }}>
+        <AppContext.Provider value={{ state: { ...state, user: { ...state.user, avatarUrl: userAvatar } }, addTransaction, addGoal, updateUser, updateMonthlyIncome, processVoiceCommand, isProcessing, isLoading }}>
             {children}
         </AppContext.Provider>
     );

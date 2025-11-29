@@ -1,13 +1,25 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useApp } from '../contexts/AppContext';
 import { VoiceAgent } from '../components/VoiceAgent';
 
 export const Budget = () => {
-  const { state } = useApp();
+  const { state, isLoading, updateMonthlyIncome } = useApp();
   const [showVoice, setShowVoice] = useState(false);
 
-  const fixedExpenses = state.transactions.filter(t => t.category === 'Rent' || t.category === 'EMI' || t.category === 'Fees');
-  const variableExpenses = state.transactions.filter(t => !fixedExpenses.includes(t) && t.type === 'expense');
+  const fixedExpenses = useMemo(() =>
+    state.transactions.filter(t => t.category?.toLowerCase().includes('rent') || t.category?.toLowerCase().includes('emi') || t.category?.toLowerCase().includes('fee'))
+  , [state.transactions]);
+  const variableExpenses = useMemo(() =>
+    state.transactions.filter(t => !fixedExpenses.includes(t) && t.type === 'expense')
+  , [fixedExpenses, state.transactions]);
+
+  if (isLoading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <p className="text-gray-600 dark:text-gray-300">Loading your budget from Supabase...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 md:p-10 max-w-4xl mx-auto">
@@ -35,11 +47,12 @@ export const Budget = () => {
           <h2 className="text-text-dark-primary dark:text-white text-[22px] font-bold leading-tight tracking-[-0.015em]">Your Monthly Income</h2>
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-4 text-2xl font-bold text-gray-500 dark:text-gray-400">₹</span>
-            <input 
-                className="w-full h-16 bg-background-light dark:bg-background-dark/80 rounded-xl pl-10 pr-4 text-2xl font-bold text-text-dark-primary dark:text-white focus:ring-2 focus:ring-primary border-0" 
-                placeholder="Enter your total income" 
-                type="text" 
-                defaultValue={state.monthlyIncome}
+            <input
+                className="w-full h-16 bg-background-light dark:bg-background-dark/80 rounded-xl pl-10 pr-4 text-2xl font-bold text-text-dark-primary dark:text-white focus:ring-2 focus:ring-primary border-0"
+                placeholder="Enter your total income"
+                type="number"
+                value={state.monthlyIncome}
+                onChange={event => void updateMonthlyIncome(Number(event.target.value) || 0)}
             />
           </div>
         </div>
